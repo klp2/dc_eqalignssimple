@@ -49,17 +49,30 @@ let s:LINE_WITH_EQ_TXT
 \    . '\(:\@<=\s\|=\)'
 \    . '\s*\(.*\)$'
 
+" Build a simple matcher around the specified pattern
+" For example, to default to aligning on <-- in files of filetype
+function! EQAS_Match_On (pattern)
+    return '^\(\%(\s*"\)\?\%('.s:QUOTELIKE.'\|[^''"]\)\{-}\)\s*'
+    \    . a:pattern
+    \    . '\s*\(.*\)$'
+endfunction
+
+" Configure for each filetype (global, so others can extend it)
+let g:EQAS_default_match = {
+\    'perl'  : s:LINE_WITH_EQ_ARROW,
+\    'perl6' : s:LINE_WITH_EQ_ARROW,
+\    'ruby'  : s:LINE_WITH_EQ_ARROW,
+\    'php'   : s:LINE_WITH_EQ_ARROW,
+\    'vim'   : s:LINE_WITH_EQ_VIM,
+\    'css'   : EQAS_Match_On( '\(::\@!\)' ),
+\    'json'  : EQAS_Match_On( '\(::\@!\)' )
+\}
+
 function EQAS_Align (mode, ...) range
     let option = a:0 ? a:1 : {}
 
-    "What symbol to align (defaults to '=' variants)...
-    if &filetype =~ '^\%(perl6\?\|ruby\|php\)'
-        let search_pat = s:LINE_WITH_EQ_ARROW
-    elseif &filetype == 'vim'
-        let search_pat = s:LINE_WITH_EQ_VIM
-    else
-        let search_pat = s:LINE_WITH_EQ_TXT
-    endif
+    "What symbol to align by default (determined by filetype and g:EQAS_default_match)
+    let search_pat = get(g:EQAS_default_match, &filetype, s:LINE_WITH_EQ_TXT)
 
     "Handle config options on search...
     if strlen(get(option,'pattern',""))
@@ -73,8 +86,9 @@ function EQAS_Align (mode, ...) range
         let curr_line = getline(line_num)
         let curr_char = curr_line[start_pos]
 
-        "Classify the char under the cursor as space or keyword or other
+        "Classify the char under the cursor as space or colon or keyword or other
         let sym_type = curr_char =~ '\s' ? '\s'
+        \            : curr_char =~ ':'  ? ':'
         \            : curr_char =~ '\k' ? '\k'
         \            :                     '\k\@!\S'
 
@@ -91,7 +105,7 @@ function EQAS_Align (mode, ...) range
     endif
 
     "Locate block of code to be considered (same indentation, no blanks)
-    if a:mode == 'vmap'
+    if a:mode == 'xmap'
         let firstline = a:firstline
         let lastline  = a:lastline
 
@@ -149,10 +163,10 @@ endfunction
 
 nmap <silent> =     :call EQAS_Align('nmap')<CR>
 nmap <silent> ==    :call EQAS_Align('nmap', {'paragraph':1} )<CR>
-nmap <silent> +     :call EQAS_Align('nmap', {'cursor':1} )<CR>:%s/\s\+$//<CR>``
-nmap <silent> ++    :call EQAS_Align('nmap', {'cursor':1, 'paragraph':1} )<CR>:%s/\s\+$//<CR>``
-vmap <silent> =     :call EQAS_Align('vmap')<CR>
-vmap <silent> +     :call EQAS_Align('vmap', {'cursor':1} )<CR>
+nmap <silent> +     :call EQAS_Align('nmap', {'cursor':1} )<CR>:%s/\s\+$//e<CR>``
+nmap <silent> ++    :call EQAS_Align('nmap', {'cursor':1, 'paragraph':1} )<CR>:%s/\s\+$//e<CR>``
+xmap <silent> =     :call EQAS_Align('xmap')<CR>
+xmap <silent> +     :call EQAS_Align('xmap', {'cursor':1} )<CR>
 
 " Restore previous external compatibility options
 let &cpo = s:save_cpo
